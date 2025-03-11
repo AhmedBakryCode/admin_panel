@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'cubits/courses_cubit.dart';
 import 'cubits/tests_cubits.dart';
+import 'cubits/users_cubit.dart';
 import 'screens/courses_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -13,10 +14,10 @@ void main() async {
   runApp(
     MultiBlocProvider(
       providers: [
-                BlocProvider(create: (context) => TestsCubit()..loadTests()),
+        BlocProvider(create: (context) => UsersCubit()..loadUsers()),
+        BlocProvider(create: (context) => TestsCubit()..loadTests()),
         BlocProvider(create: (context) => CoursesCubit()..loadCourses()),
-               // BlocProvider(create: (context) => FilesCubit()..loadFiles()),
-
+        // BlocProvider(create: (context) => FilesCubit()..loadFiles()),
       ],
       child: MyApp(),
     ),

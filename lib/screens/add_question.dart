@@ -6,8 +6,14 @@ import '../cubits/tests_cubits.dart';
 class AddQuestionsScreen extends StatefulWidget {
   final String testName;
   final String videoName;
+  final String? testId; // جديد: معرف الاختبار للتعديل
+  final List<Map<String, dynamic>>? existingQuestions; // جديد: الأسئلة الموجودة
 
-  AddQuestionsScreen({required this.testName, required this.videoName});
+  AddQuestionsScreen(
+      {required this.testName,
+      required this.videoName,
+      this.testId,
+      this.existingQuestions});
 
   @override
   _AddQuestionsScreenState createState() => _AddQuestionsScreenState();
@@ -16,6 +22,26 @@ class AddQuestionsScreen extends StatefulWidget {
 class _AddQuestionsScreenState extends State<AddQuestionsScreen> {
   final PageController _pageController = PageController();
   List<Map<String, dynamic>> _questions = [];
+  @override
+  void initState() {
+    super.initState();
+    // تهيئة الأسئلة من البيانات الموجودة إذا كانت في وضع التعديل
+    _questions = widget.existingQuestions ?? [];
+  }
+
+  void _saveTest(BuildContext context) {
+    if (widget.testId == null) {
+      // حالة الإضافة الجديدة
+      context
+          .read<TestsCubit>()
+          .addTest(widget.testName, widget.videoName, _questions);
+    } else {
+      // حالة التعديل
+      context.read<TestsCubit>().updateTest(
+          widget.testId!, widget.testName, widget.videoName, _questions);
+    }
+    Navigator.popUntil(context, (route) => route.isFirst);
+  }
 
   void _addQuestion() {
     _questions.add({
@@ -58,27 +84,35 @@ class _AddQuestionsScreenState extends State<AddQuestionsScreen> {
             decoration: InputDecoration(labelText: 'السؤال'),
             onChanged: (value) => _questions[index]['question'] = value,
           ),
-          ...List.generate(4, (optionIndex) => TextFormField(
-            decoration: InputDecoration(labelText: 'الاختيار ${optionIndex + 1}'),
-            onChanged: (value) => _questions[index]['options'][optionIndex] = value,
-          )),
+          ...List.generate(
+              4,
+              (optionIndex) => TextFormField(
+                    decoration: InputDecoration(
+                        labelText: 'الاختيار ${optionIndex + 1}'),
+                    onChanged: (value) =>
+                        _questions[index]['options'][optionIndex] = value,
+                  )),
           TextFormField(
             decoration: InputDecoration(labelText: 'رقم الإجابة الصحيحة (1-4)'),
             keyboardType: TextInputType.number,
-            onChanged: (value) => _questions[index]['correctAnswer'] = int.parse(value) - 1,
+            onChanged: (value) =>
+                _questions[index]['correctAnswer'] = int.parse(value) - 1,
           ),
         ],
       ),
     );
   }
 
-  void _saveTest(BuildContext context) {
-    if (_questions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('أضف على الأقل سؤال واحد')));
-      return;
-    }
-
-    context.read<TestsCubit>().addTest(widget.testName, widget.videoName, _questions);
-    Navigator.popUntil(context, (route) => route.isFirst);
-  }
+  // void _saveTest(BuildContext context) {
+  //   if (_questions.isEmpty) {
+  //     ScaffoldMessenger.of(context)
+  //         .showSnackBar(SnackBar(content: Text('أضف على الأقل سؤال واحد')));
+  //     return;
+  //   }
+  //
+  //   context
+  //       .read<TestsCubit>()
+  //       .addTest(widget.testName, widget.videoName, _questions);
+  //   Navigator.popUntil(context, (route) => route.isFirst);
+  // }
 }

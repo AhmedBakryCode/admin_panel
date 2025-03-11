@@ -1,3 +1,4 @@
+import 'package:admin_panel/screens/users_screen.dart';
 import 'package:flutter/material.dart';
 import 'courses_screen.dart';
 import 'tests_screen.dart';
@@ -10,16 +11,20 @@ class HomeScreen extends StatelessWidget {
       body: GridView.count(
         crossAxisCount: 2,
         children: [
-          _buildGridItem(context, 'الكورسات', Icons.video_library, CoursesScreen()),
+          _buildGridItem(
+              context, 'الكورسات', Icons.video_library, CoursesScreen()),
           _buildGridItem(context, 'الاختبارات', Icons.quiz, TestsScreen()),
+          _buildGridItem(context, 'الحسابات', Icons.people, UsersScreen()),
         ],
       ),
     );
   }
 
-  Widget _buildGridItem(BuildContext context, String title, IconData icon, Widget screen) {
+  Widget _buildGridItem(
+      BuildContext context, String title, IconData icon, Widget screen) {
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
+      onTap: () =>
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
       child: Card(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
