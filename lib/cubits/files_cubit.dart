@@ -8,6 +8,7 @@ import '../services.dart';
 class FilesCubit extends Cubit<FilesState> {
   final String courseName;
   final FirebaseStorageService _service = FirebaseStorageService();
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   FilesCubit(this.courseName) : super(FilesInitial()) {
     loadFiles();
@@ -20,6 +21,30 @@ class FilesCubit extends Cubit<FilesState> {
       emit(FilesLoaded(files));
     } catch (e) {
       emit(FilesError(e.toString()));
+    }
+  }
+
+  Future<void> deleteFile(Reference fileRef) async {
+    try {
+      await fileRef.delete();
+      loadFiles();
+    } catch (e) {
+      emit(FilesError("فشل حذف الملف"));
+    }
+  }
+
+  Future<void> editFileName(Reference fileRef, String newName) async {
+    try {
+      Uint8List? fileData = await fileRef.getData();
+      if (fileData != null) {
+        await _storage.ref('$courseName/$newName').putData(fileData);
+        await fileRef.delete(); // حذف الملف القديم بعد إعادة تسميته
+        loadFiles();
+      } else {
+        emit(FilesError("فشل في إعادة تسمية الملف"));
+      }
+    } catch (e) {
+      emit(FilesError("حدث خطأ أثناء إعادة التسمية"));
     }
   }
 
@@ -43,6 +68,11 @@ class FilesLoading extends FilesState {}
 class FilesLoaded extends FilesState {
   final List<Reference> files;
   FilesLoaded(this.files);
+}
+
+class FilesSuccess extends FilesState {
+  final String message;
+  FilesSuccess(this.message);
 }
 
 class FilesError extends FilesState {
