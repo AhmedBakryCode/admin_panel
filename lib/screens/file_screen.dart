@@ -24,13 +24,30 @@ class FilesScreen extends StatelessWidget {
           } else if (state is FilesLoaded) {
             return ListView.builder(
               itemCount: state.files.length,
-              itemBuilder: (context, index) => ListTile(
-                title: Text(state.files[index].name),
-                trailing: IconButton(
-                  icon: Icon(Icons.download),
-                  onPressed: () => _downloadFile(state.files[index]),
-                ),
-              ),
+              itemBuilder: (context, index) {
+                final file = state.files[index];
+
+                return ListTile(
+                  title: Text(file.name),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _showEditDialog(context, file),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteFile(context, file),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.download),
+                        onPressed: () => _downloadFile(file),
+                      ),
+                    ],
+                  ),
+                );
+              },
             );
           } else if (state is FilesError) {
             return Center(child: Text(state.message));
@@ -44,18 +61,19 @@ class FilesScreen extends StatelessWidget {
   Future<void> _pickAndUploadVideo(BuildContext context) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.video,
-      allowMultiple: true,
+      allowMultiple: false,
     );
 
     if (result == null) return;
 
     PlatformFile file = result.files.first;
-    Uint8List? fileBytes = file.bytes;
-    String fileName = file.name;
-
+    Uint8List? fileBytes = file.bytes ?? await File(file.path!).readAsBytes();
     if (fileBytes == null) return;
 
-    TextEditingController nameController = TextEditingController(text: fileName);
+    String fileName = file.name;
+    TextEditingController nameController =
+        TextEditingController(text: fileName);
+
     bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -85,9 +103,97 @@ class FilesScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _showEditDialog(BuildContext context, Reference fileRef) async {
+    TextEditingController nameController =
+        TextEditingController(text: fileRef.name);
+    Uint8List? newFileBytes;
+    String? newFileName;
+
+    Future<void> pickNewVideo() async {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.video,
+        allowMultiple: false,
+      );
+
+      if (result != null) {
+        newFileName = result.files.first.name;
+        newFileBytes = result.files.first.bytes ??
+            await File(result.files.first.path!).readAsBytes();
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('تعديل الفيديو'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: 'اسم الفيديو'),
+              ),
+              SizedBox(height: 10),
+              newFileBytes == null
+                  ? Text('📌 لم يتم اختيار فيديو جديد')
+                  : Text('✅ فيديو جديد جاهز للرفع'),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () async {
+                  await pickNewVideo();
+                  setState(() {}); // تحديث الواجهة عند اختيار فيديو جديد
+                },
+                child: Text('🔄 تغيير الفيديو'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                context
+                    .read<FilesCubit>()
+                    .editFileName(fileRef, nameController.text);
+                Navigator.pop(context);
+              },
+              child: Text('✅ Finish'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteFile(BuildContext context, Reference fileRef) async {
+    bool? confirmDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('حذف الفيديو'),
+        content: Text('هل أنت متأكد من حذف هذا الفيديو؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmDelete == true) {
+      context.read<FilesCubit>().deleteFile(fileRef);
+    }
+  }
+
   Future<void> _downloadFile(Reference fileRef) async {
     String url = await fileRef.getDownloadURL();
-    // يمكنك استخدام package مثل 'url_launcher' لفتح الرابط
     print('رابط التحميل: $url');
   }
 }
