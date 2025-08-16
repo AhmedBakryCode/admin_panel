@@ -35,7 +35,7 @@ class TestsScreen extends StatelessWidget {
 
   Widget _buildTestItem(BuildContext context, Map<String, dynamic> test) {
     return ListTile(
-      title: Text(test['testName']),
+      title: Text(test['testName'] ?? " "),
       subtitle: Text('الفيديو: ${test['videoName']}'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,

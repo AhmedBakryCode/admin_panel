@@ -32,8 +32,15 @@ class UsersScreen extends StatelessWidget {
       itemCount: users.length,
       itemBuilder: (context, index) => ListTile(
         title: Text(users[index]['name']),
-        subtitle: Text(
-            'مستخدم: ${users[index]['isUsed'] ? 'مُستخدم' : 'غير مُستخدم'}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('كود: ${users[index]['code']}'),
+            Text('الكورسات:'),
+            ...users[index]['courses'].entries.map((entry) => Text(
+                '${entry.key}: ${entry.value ? 'مُستخدم' : 'غير مُستخدم'}')),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -53,30 +60,85 @@ class UsersScreen extends StatelessWidget {
 
   void _showAddUserDialog(BuildContext context) {
     TextEditingController nameController = TextEditingController();
+    String? selectedCourse;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('إضافة حساب جديد'),
-        content: TextFormField(
-          controller: nameController,
-          decoration: InputDecoration(labelText: 'اسم المستخدم'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                context.read<UsersCubit>().addUser(nameController.text);
-                Navigator.pop(context);
-              }
-            },
-            child: Text('حفظ'),
-          ),
-        ],
+      builder: (context) => FutureBuilder<List<String>>(
+        future: context.read<UsersCubit>().getAvailableCourses(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return AlertDialog(
+              content: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError) {
+            return AlertDialog(
+              content: Text('خطأ في جلب الكورسات'),
+            );
+          }
+          List<String> availableCourses = snapshot.data!;
+          String code = context.read<UsersCubit>().generateUniqueCode();
+
+          return StatefulBuilder(
+            builder: (context, setState) => AlertDialog(
+              title: Text('إضافة حساب جديد'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(labelText: 'اسم المستخدم'),
+                  ),
+                  SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    decoration: InputDecoration(labelText: 'اختر الكورس'),
+                    value: selectedCourse,
+                    items: availableCourses
+                        .map((course) => DropdownMenuItem(
+                              value: course,
+                              child: Text(course),
+                            ))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => selectedCourse = value),
+                  ),
+                  SizedBox(height: 16),
+                  Text('الكود المُولد: $code'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('إلغاء'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (nameController.text.isNotEmpty &&
+                        selectedCourse != null) {
+                      Map<String, bool> courseUsage = {
+                        for (var course in availableCourses)
+                          course: course == selectedCourse
+                      };
+                      context.read<UsersCubit>().addUser(
+                            nameController.text,
+                            code,
+                            courseUsage,
+                          );
+                      Navigator.pop(context);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('يرجى إدخال الاسم واختيار كورس')),
+                      );
+                    }
+                  },
+                  child: Text('حفظ'),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -84,45 +146,67 @@ class UsersScreen extends StatelessWidget {
   void _showEditUserDialog(BuildContext context, Map<String, dynamic> user) {
     TextEditingController nameController =
         TextEditingController(text: user['name']);
-    bool isUsed = user['isUsed'];
+    Map<String, bool> courseUsage = Map.from(user['courses']);
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('تعديل الحساب'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: InputDecoration(labelText: 'اسم المستخدم'),
+      builder: (context) => FutureBuilder<List<String>>(
+        future: context.read<UsersCubit>().getAvailableCourses(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return AlertDialog(
+              content: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError) {
+            return AlertDialog(
+              content: Text('خطأ في جلب الكورسات'),
+            );
+          }
+          List<String> availableCourses = snapshot.data!;
+
+          return StatefulBuilder(
+            builder: (context, setState) => AlertDialog(
+              title: Text('تعديل الحساب'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(labelText: 'اسم المستخدم'),
+                  ),
+                  Text('الكود: ${user['code']}'),
+                  ...availableCourses.map(
+                    (course) => CheckboxListTile(
+                      title: Text(course),
+                      value: courseUsage[course] ?? false,
+                      onChanged: (value) =>
+                          setState(() => courseUsage[course] = value!),
+                    ),
+                  ),
+                ],
               ),
-              CheckboxListTile(
-                title: Text('حالة الاستخدام'),
-                value: isUsed,
-                onChanged: (value) => setState(() => isUsed = value!),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('إلغاء'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('إلغاء'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    context.read<UsersCubit>().updateUser(
+                          user['id'],
+                          nameController.text,
+                          user['code'],
+                          courseUsage,
+                        );
+                    Navigator.pop(context);
+                  },
+                  child: Text('حفظ التعديلات'),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () {
-                context.read<UsersCubit>().updateUser(
-                      user['id'],
-                      nameController.text,
-                      isUsed,
-                    );
-                Navigator.pop(context);
-              },
-              child: Text('حفظ التعديلات'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

@@ -12,7 +12,7 @@ class FilesScreen extends StatelessWidget {
     final courseName = context.read<FilesCubit>().courseName;
 
     return Scaffold(
-      appBar: AppBar(title: Text(courseName)),
+      appBar: AppBar(title: Text(courseName!)),
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.upload),
         onPressed: () => _pickAndUploadVideo(context),
@@ -72,7 +72,7 @@ class FilesScreen extends StatelessWidget {
 
     String fileName = file.name;
     TextEditingController nameController =
-        TextEditingController(text: fileName);
+    TextEditingController(text: fileName);
 
     bool? confirmed = await showDialog<bool>(
       context: context,
@@ -96,16 +96,75 @@ class FilesScreen extends StatelessWidget {
     );
 
     if (confirmed == true && nameController.text.isNotEmpty) {
-      context.read<FilesCubit>().uploadFile(
+      await context.read<FilesCubit>().uploadFile(
+        nameController.text,
+        fileBytes,
+      );
+      // Show dialog to add test link after successful upload
+      bool? addTestLink = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('إضافة رابط اختبار'),
+          content: Text('هل تريد إضافة رابط اختبار لهذا الفيديو؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('لا'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('نعم'),
+            ),
+          ],
+        ),
+      );
+
+      if (addTestLink == true) {
+        TextEditingController linkController = TextEditingController();
+        bool? linkConfirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('إدخال رابط الاختبار'),
+            content: TextFormField(
+              controller: linkController,
+              decoration: InputDecoration(hintText: 'أدخل رابط جوجل فورم'),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'الرجاء إدخال رابط';
+                }
+                return null;
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (linkController.text.isNotEmpty) {
+                    Navigator.pop(context, true);
+                  }
+                },
+                child: Text('حفظ'),
+              ),
+            ],
+          ),
+        );
+
+        if (linkConfirmed == true) {
+          await context.read<FilesCubit>().addTestLink(
             nameController.text,
-            fileBytes,
+            linkController.text,
           );
+        }
+      }
     }
   }
 
   Future<void> _showEditDialog(BuildContext context, Reference fileRef) async {
     TextEditingController nameController =
-        TextEditingController(text: fileRef.name);
+    TextEditingController(text: fileRef.name);
     Uint8List? newFileBytes;
     String? newFileName;
 
@@ -142,7 +201,7 @@ class FilesScreen extends StatelessWidget {
               ElevatedButton(
                 onPressed: () async {
                   await pickNewVideo();
-                  setState(() {}); // تحديث الواجهة عند اختيار فيديو جديد
+                  setState(() {});
                 },
                 child: Text('🔄 تغيير الفيديو'),
               ),
